@@ -8,6 +8,7 @@
 #include "face_data.hpp"
 #include "net_facenet_unfused.hpp"
 #include "face_loss.hpp"
+#include "onnx_build_face.hpp"   // fused net + ONNX export
 #include "optim.hpp"
 #include <cstdio>
 #include <cmath>
@@ -33,6 +34,12 @@ int main(int argc, char** argv) {
   std::string DN = opt(argc, argv, "--datanet", "pure/ref/data_net/"); if (DN.back() != '/') DN += '/';
   int64_t S = (int64_t)atoll(opt(argc, argv, "--imgsz", "160").c_str());
   std::string ckpt = opt(argc, argv, "--ckpt", "");
+
+  if (cmd == "export") {                                  // fused -> ONNX (opset 13)
+    std::string out = (argc > 2 && argv[2][0] != '-') ? argv[2] : "facenet.onnx";
+    FaceProv fp = load_facenet(DN); Graph g = build_facenet_onnx(fp, S); save_onnx(g, out);
+    printf("wrote %s (%zu nodes, imgsz=%lld)\n", out.c_str(), g.nodes.size(), (long long)S); return 0;
+  }
 
   UProv p = load_facenet_unfused(DN);
 

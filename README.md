@@ -36,6 +36,7 @@ facenet train    <dataset_dir> <triplet|arcface|softmax> <steps> [--P 3 --K 4 --
 facenet embed    <img>                 [--ckpt f --datanet d --imgsz 160]
 facenet verify   <imgA> <imgB>         [--thr 0.5 ...]
 facenet identify <probe> <gallery_dir> [...]
+facenet export   <out.onnx>            [--imgsz 160]      # fused -> ONNX (opset 13)
 ```
 Dataset = folder-per-identity (`root/<person>/<img>.jpg`). `--ckpt` loads a fine-tuned checkpoint;
 without it, the pretrained embedding is used. **CPU speedup:** add `-DUSE_EIGEN
@@ -53,8 +54,10 @@ Eigen (same results, ~faster) — the conv/gemm already go through the `bk::` ba
 3. ✅ losses: Triplet (FaceNet paper) + ArcFace + cosine-softmax (all gradchecked)
 4. ✅ training loop (dataset → loss → Adam), checkpoints, from-pretrained fine-tune
 5. ✅ inference/verification CLI (embed, 1:1 verify, 1:N identify)
-6. **next:** standalone demo (bundled weights); all-in-one `facenet` CLI; `.pt`/ONNX I/O
-7. (later) Eigen / Thrust device / cuDNN backends, like the sibling repos
+6. ✅ unified `facenet` CLI (train/embed/verify/identify/export) + CPU Eigen speedup
+7. ✅ ONNX I/O — `facenet export` (opset 13, `onnx_build_face.hpp`) verified vs onnxruntime
+   (**5.96e-08**) and a pure-C++ ONNX runner (`onnx_run_face.hpp`, **1.19e-07**)
+8. **next:** standalone demo (bundled weights); real-data fine-tune (LFW); Thrust/cuDNN device
 
 Reused verbatim from the sibling engine: `autograd/backend/ops2d/linalg/bn/optim/ptio/dataset/
 parallel/dtensor` + stb + flat Eigen. FaceNet-specific: `face_ops.hpp`, `net_facenet.hpp`, `pure/ref/*`.
