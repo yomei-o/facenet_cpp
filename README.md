@@ -62,6 +62,10 @@ Eigen (same results, ~faster) — the conv/gemm already go through the `bk::` ba
 - **training** (`train_face.cpp` + `face_data.hpp`): Adam, from-pretrained fine-tune, BN train-mode,
   checkpoint save/reload. ArcFace on a 4-identity set: loss 8.86 → 5.37 in 5 steps (decreasing).
 - **inference** (`verify_face.cpp`): unit-embedding cosine/euclidean; verify + rank-based identify.
+- **real-data eval** (`lfw_eval.cpp`): on **LFW** (300 pairs, pretrained, no MTCNN align) the pure-C++
+  embedding gives mean cosine **same 0.73 / diff 0.05** → **97.3% accuracy** at the calibrated
+  threshold **cos ≥ 0.48** (now the `verify` default). Proper MTCNN alignment approaches the ~99.6%
+  reference. `lfw_eval <pairs.txt>` sweeps the threshold; pairs list = `pathA pathB label` per line.
 
 ## Roadmap
 1. ✅ extract InceptionResnetV1 arch from facenet-pytorch + fused forward exact parity (1e-7)
@@ -73,7 +77,8 @@ Eigen (same results, ~faster) — the conv/gemm already go through the `bk::` ba
 7. ✅ ONNX I/O — `facenet export` (opset 13, `onnx_build_face.hpp`) verified vs onnxruntime
    (**5.96e-08**) and a pure-C++ ONNX runner (`onnx_run_face.hpp`, **1.19e-07**)
 8. ✅ standalone `demo_face` with bundled fp16 weights (clone-and-run, no Python; ~2e-04 vs fp32)
-9. **next:** real-data fine-tune (LFW); Thrust/cuDNN device backend, like the sibling repos
+9. ✅ real-data eval on LFW (97.3% @ cos≥0.48, pure C++) + verify-threshold calibration
+10. **next:** Thrust/cuDNN device backend + Colab GPU, like the sibling repos
 
 Reused verbatim from the sibling engine: `autograd/backend/ops2d/linalg/bn/optim/ptio/dataset/
 parallel/dtensor` + stb + flat Eigen. FaceNet-specific: `face_ops.hpp`, `net_facenet.hpp`, `pure/ref/*`.

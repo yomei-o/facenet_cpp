@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
   std::string cmd = argv[1];
   std::string WD = opt(argc, argv, "--weights", "weights/facenet/"); if (WD.back() != '/') WD += '/';
   int64_t S = (int64_t)atoll(opt(argc, argv, "--imgsz", "160").c_str());
-  float thr = (float)atof(opt(argc, argv, "--thr", "0.5").c_str());
+  float thr = (float)atof(opt(argc, argv, "--thr", "0.48").c_str());
 
   FaceProv p = load_facenet_fp16(WD);
   printf("loaded fp16 weights from %s\n", WD.c_str());

@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
   std::string DN = opt(argc, argv, "--datanet", "pure/ref/data_net/"); if (DN.back() != '/') DN += '/';
   std::string ckpt = opt(argc, argv, "--ckpt", "");
   int64_t S = (int64_t)atoll(opt(argc, argv, "--imgsz", "160").c_str());
-  float thr = (float)atof(opt(argc, argv, "--thr", "0.5").c_str());
+  float thr = (float)atof(opt(argc, argv, "--thr", "0.48").c_str());
 
   UProv p = load_facenet_unfused(DN);
   if (!ckpt.empty()) { load_facenet_weights(p, ckpt); printf("loaded checkpoint %s\n", ckpt.c_str()); }

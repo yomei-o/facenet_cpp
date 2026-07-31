@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
     auto e = embed(argv[2], p, S); printf("embedding[512] L2=%.4f [:8]=", std::sqrt(cosine(e, e)));
     for (int i = 0; i < 8; ++i) printf("% .4f ", e[i]); printf("\n");
   } else if (cmd == "verify") {
-    float thr = (float)atof(opt(argc, argv, "--thr", "0.5").c_str());
+    float thr = (float)atof(opt(argc, argv, "--thr", "0.48").c_str());
     auto a = embed(argv[2], p, S), b = embed(argv[3], p, S); float cs = cosine(a, b);
     printf("cosine=%.4f euclidean=%.4f -> %s (thr cos=%.2f)\n", cs, std::sqrt(std::max(0.f, 2 - 2 * cs)), cs >= thr ? "SAME" : "DIFFERENT", thr);
   } else if (cmd == "identify") {
