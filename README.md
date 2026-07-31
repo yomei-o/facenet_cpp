@@ -30,14 +30,17 @@ g++ -O2 -std=c++17 -Ipure/third_party pure/m1_forward_face.cpp -o m1 && ./m1
 ```
 
 ## Training + inference (pure C++)
+One unified CLI (`facenet.cpp`) — or the standalone `train_face` / `verify_face`:
 ```sh
-# fine-tune the pretrained embedding on a folder-per-identity dataset (root/<person>/<img>.jpg)
-train_face  <dataset_dir> <triplet|arcface|softmax> <steps> [P K imgsz lr datanet ckpt]
-# inference: embed / 1:1 verify / 1:N identify  (loads pretrained, or --ckpt from training)
-verify_face embed    <img>            [--ckpt f --datanet d --imgsz 160]
-verify_face verify   <imgA> <imgB>    [--thr 0.5 ...]
-verify_face identify <probe> <gallery_dir> [...]
+facenet train    <dataset_dir> <triplet|arcface|softmax> <steps> [--P 3 --K 4 --lr 1e-4 --ckpt out.bin]
+facenet embed    <img>                 [--ckpt f --datanet d --imgsz 160]
+facenet verify   <imgA> <imgB>         [--thr 0.5 ...]
+facenet identify <probe> <gallery_dir> [...]
 ```
+Dataset = folder-per-identity (`root/<person>/<img>.jpg`). `--ckpt` loads a fine-tuned checkpoint;
+without it, the pretrained embedding is used. **CPU speedup:** add `-DUSE_EIGEN
+-Ipure/third_party/eigen_flat` (+ `/arch:AVX2` or `-march=native`) to route conv/matmul through
+Eigen (same results, ~faster) — the conv/gemm already go through the `bk::` backend seam.
 - **losses** (`face_loss.hpp`, all gradchecked to ~1e-4): `triplet_loss` (batch-all/hard, FaceNet
   paper), `arcface_loss` (additive angular margin), `softmax_ce_loss` (cosine softmax).
 - **training** (`train_face.cpp` + `face_data.hpp`): Adam, from-pretrained fine-tune, BN train-mode,
