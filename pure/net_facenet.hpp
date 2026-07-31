@@ -14,6 +14,15 @@
 struct FLayer { int kind; int64_t Co, Ci, kh, kw, sh, sw, ph, pw; Tensor w, b; };  // kind 0=conv 1=linear
 struct FaceProv { std::vector<FLayer> L; size_t i = 0; FLayer& next() { return L[i++]; } };
 
+// IEEE-754 half -> float (for the bundled fp16 demo weights).
+inline float half2float(uint16_t h) {
+  uint32_t sign = (uint32_t)(h & 0x8000) << 16, exp = (h >> 10) & 0x1F, mant = h & 0x3FF, f;
+  if (exp == 0) { if (mant == 0) f = sign; else { int e = -1; do { ++e; mant <<= 1; } while (!(mant & 0x400)); mant &= 0x3FF; f = sign | ((uint32_t)(127 - 15 - e) << 23) | (mant << 13); } }
+  else if (exp == 0x1F) f = sign | 0x7F800000u | (mant << 13);
+  else f = sign | ((exp - 15 + 127) << 23) | (mant << 13);
+  float o; std::memcpy(&o, &f, 4); return o;
+}
+
 inline FaceProv load_facenet(const std::string& dir) {
   std::string D = dir; if (!D.empty() && D.back() != '/') D += '/';
   std::ifstream mf(D + "manifest.txt"); if (!mf) { printf("missing %smanifest.txt\n", D.c_str()); std::exit(1); }
@@ -31,6 +40,25 @@ inline FaceProv load_facenet(const std::string& dir) {
       L.w = from_data({L.Co, L.Ci}, rd(L.Co * L.Ci), true);
       L.b = from_data({L.Co}, rd(L.Co), true);
     }
+    p.L.push_back(std::move(L));
+  }
+  return p;
+}
+
+// load fp16 fused weights (bundled demo): manifest.txt + weights_fp16.bin (half), up-converted.
+inline FaceProv load_facenet_fp16(const std::string& dir) {
+  std::string D = dir; if (!D.empty() && D.back() != '/') D += '/';
+  std::ifstream mf(D + "manifest.txt"); if (!mf) { printf("missing %smanifest.txt\n", D.c_str()); std::exit(1); }
+  std::ifstream wf(D + "weights_fp16.bin", std::ios::binary); if (!wf) { printf("missing %sweights_fp16.bin\n", D.c_str()); std::exit(1); }
+  auto rd = [&](int64_t n) { std::vector<uint16_t> h(n); wf.read((char*)h.data(), n * 2);
+    std::vector<float> v(n); for (int64_t i = 0; i < n; ++i) v[i] = half2float(h[i]); return v; };
+  int N; mf >> N; FaceProv p; p.L.reserve(N);
+  for (int i = 0; i < N; ++i) {
+    std::string k; mf >> k; FLayer L{};
+    if (k == "C") { int hb; mf >> L.Co >> L.Ci >> L.kh >> L.kw >> L.sh >> L.sw >> L.ph >> L.pw >> hb; L.kind = 0;
+      L.w = from_data({L.Co, L.Ci, L.kh, L.kw}, rd(L.Co * L.Ci * L.kh * L.kw), true); L.b = from_data({L.Co}, rd(L.Co), true); }
+    else { int hb; mf >> L.Co >> L.Ci >> hb; L.kind = 1;
+      L.w = from_data({L.Co, L.Ci}, rd(L.Co * L.Ci), true); L.b = from_data({L.Co}, rd(L.Co), true); }
     p.L.push_back(std::move(L));
   }
   return p;

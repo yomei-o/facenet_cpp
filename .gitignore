@@ -13,3 +13,9 @@ pure/ref/data_net/
 /*.png
 out/
 scratch/
+
+# bundled fp16 demo weights (~47MB)
+!weights/
+!weights/facenet/
+!weights/facenet/weights_fp16.bin
+!weights/facenet/manifest.txt

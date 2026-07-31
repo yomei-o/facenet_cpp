@@ -29,6 +29,21 @@ m1_forward_face pure/ref/data_net/ pure/ref/ 160   # -> worst 1.19e-07 MATCH
 g++ -O2 -std=c++17 -Ipure/third_party pure/m1_forward_face.cpp -o m1 && ./m1
 ```
 
+## Quick start — face recognition right after `git clone` (no Python)
+
+Pretrained fp16 weights ship in the repo (`weights/facenet/`, ~47 MB). `demo_face` is fully
+self-contained — bring two roughly-cropped face images (any size, auto-resized to 160):
+```sh
+# Windows (MSVC)                                            # Linux/macOS
+cl /std:c++20 /O2 /EHsc /Zc:preprocessor /DNOMINMAX /Ipure\third_party pure\demo_face.cpp
+demo_face verify   a.jpg b.jpg          # same person?     # g++ -O2 -std=c++17 -Ipure/third_party pure/demo_face.cpp -o demo_face
+demo_face identify probe.jpg gallery/   # who is it? (gallery = folder-per-identity)
+demo_face embed    face.jpg             # 512-D embedding
+demo_face selftest                      # fp16 weights vs fp32 ref: worst ~1.9e-04
+```
+The bundled fp16 weights reproduce the fp32 model to ~2e-04 on the embedding. For higher precision
+or training, regenerate fp32 weights with `export_facenet.py` (see below).
+
 ## Training + inference (pure C++)
 One unified CLI (`facenet.cpp`) — or the standalone `train_face` / `verify_face`:
 ```sh
@@ -57,7 +72,8 @@ Eigen (same results, ~faster) — the conv/gemm already go through the `bk::` ba
 6. ✅ unified `facenet` CLI (train/embed/verify/identify/export) + CPU Eigen speedup
 7. ✅ ONNX I/O — `facenet export` (opset 13, `onnx_build_face.hpp`) verified vs onnxruntime
    (**5.96e-08**) and a pure-C++ ONNX runner (`onnx_run_face.hpp`, **1.19e-07**)
-8. **next:** standalone demo (bundled weights); real-data fine-tune (LFW); Thrust/cuDNN device
+8. ✅ standalone `demo_face` with bundled fp16 weights (clone-and-run, no Python; ~2e-04 vs fp32)
+9. **next:** real-data fine-tune (LFW); Thrust/cuDNN device backend, like the sibling repos
 
 Reused verbatim from the sibling engine: `autograd/backend/ops2d/linalg/bn/optim/ptio/dataset/
 parallel/dtensor` + stb + flat Eigen. FaceNet-specific: `face_ops.hpp`, `net_facenet.hpp`, `pure/ref/*`.

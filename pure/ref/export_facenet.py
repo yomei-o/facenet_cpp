@@ -48,6 +48,13 @@ with open(os.path.join(OUT, "manifest.txt"), "w") as f:
     for e in manifest: f.write(" ".join(str(x) for x in e) + "\n")
 open(os.path.join(OUT, "weights.bin"), "wb").write(blob)
 
+# ---- fp16 fused weights for the bundled standalone demo (weights/facenet/, ~47MB) ----
+import shutil
+DEMO = os.path.join(os.path.dirname(__file__), "..", "..", "weights", "facenet"); os.makedirs(DEMO, exist_ok=True)
+shutil.copy(os.path.join(OUT, "manifest.txt"), os.path.join(DEMO, "manifest.txt"))
+np.frombuffer(bytes(blob), np.float32).astype(np.float16).tofile(os.path.join(DEMO, "weights_fp16.bin"))
+print(f"demo fp16 weights -> {os.path.normpath(DEMO)} ({len(blob)//2/1e6:.1f} MB)")
+
 # ---- unfused (BN-training) export: conv(no bias)+BN kept separate for train-mode batch stats ----
 ublob = bytearray(); umani = []
 def uput(a): ublob.extend(np.asarray(a, dtype=np.float32).tobytes())
