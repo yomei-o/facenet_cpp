@@ -76,6 +76,7 @@ inline Tensor f_mixed7a(const Tensor& x, FaceProv& p) {
 
 // full forward: input (N,3,160,160) -> (N,512) L2-normalized embedding.
 inline Tensor facenet_forward(Tensor x, FaceProv& p) {
+  p.i = 0;                                                // rewind provider (safe to call repeatedly)
   x = f_bc(x, p); x = f_bc(x, p); x = f_bc(x, p);         // conv2d_1a/2a/2b
   x = maxpool2d(x, 3, 2, 0);                              // maxpool_3a
   x = f_bc(x, p); x = f_bc(x, p); x = f_bc(x, p);         // conv2d_3b/4a/4b

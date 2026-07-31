@@ -82,6 +82,7 @@ inline Tensor u_mixed7a(const Tensor& x, UProv& p, bool tr) {
 
 // full forward -> (N,512) L2-normalized embedding.
 inline Tensor facenet_forward_u(Tensor x, UProv& p, bool tr) {
+  p.i = 0;                                                // rewind provider (safe to call repeatedly)
   x = u_bc(x, p, tr); x = u_bc(x, p, tr); x = u_bc(x, p, tr);
   x = maxpool2d(x, 3, 2, 0);
   x = u_bc(x, p, tr); x = u_bc(x, p, tr); x = u_bc(x, p, tr);
@@ -99,6 +100,30 @@ inline Tensor facenet_forward_u(Tensor x, UProv& p, bool tr) {
   x = batchnorm2d(x, Lb.gamma, Lb.beta, Lb.rm, Lb.rv, p.eps, tr, 0.1f);
   x = reshape(x, {x->shape[0], x->shape[1]});
   return l2norm_rows(x);
+}
+
+// save weights in load order (B: w,gamma,beta,rm,rv | C: w,b | L: w | N: gamma,beta,rm,rv).
+inline void save_facenet_unfused(UProv& p, const std::string& path) {
+  std::ofstream f(path, std::ios::binary);
+  auto wr = [&](const std::vector<float>& v) { f.write((const char*)v.data(), v.size() * 4); };
+  auto wt = [&](const Tensor& t) { wr(t->data); };
+  for (auto& L : p.L) {
+    if (L.kind == 0) { wt(L.w); wt(L.gamma); wt(L.beta); wr(L.rm); wr(L.rv); }
+    else if (L.kind == 1) { wt(L.w); wt(L.b); }
+    else if (L.kind == 2) { wt(L.w); }
+    else { wt(L.gamma); wt(L.beta); wr(L.rm); wr(L.rv); }
+  }
+}
+// reload weights (same manifest) from a checkpoint written by save_facenet_unfused.
+inline void load_facenet_weights(UProv& p, const std::string& path) {
+  std::ifstream f(path, std::ios::binary); if (!f) { printf("missing %s\n", path.c_str()); std::exit(1); }
+  auto rd = [&](std::vector<float>& v) { f.read((char*)v.data(), v.size() * 4); };
+  for (auto& L : p.L) {
+    if (L.kind == 0) { rd(L.w->data); rd(L.gamma->data); rd(L.beta->data); rd(L.rm); rd(L.rv); }
+    else if (L.kind == 1) { rd(L.w->data); rd(L.b->data); }
+    else if (L.kind == 2) { rd(L.w->data); }
+    else { rd(L.gamma->data); rd(L.beta->data); rd(L.rm); rd(L.rv); }
+  }
 }
 
 // collect trainable params (conv/linear weights, residual bias, BN affine) for the optimizer.

@@ -29,13 +29,28 @@ m1_forward_face pure/ref/data_net/ pure/ref/ 160   # -> worst 1.19e-07 MATCH
 g++ -O2 -std=c++17 -Ipure/third_party pure/m1_forward_face.cpp -o m1 && ./m1
 ```
 
+## Training + inference (pure C++)
+```sh
+# fine-tune the pretrained embedding on a folder-per-identity dataset (root/<person>/<img>.jpg)
+train_face  <dataset_dir> <triplet|arcface|softmax> <steps> [P K imgsz lr datanet ckpt]
+# inference: embed / 1:1 verify / 1:N identify  (loads pretrained, or --ckpt from training)
+verify_face embed    <img>            [--ckpt f --datanet d --imgsz 160]
+verify_face verify   <imgA> <imgB>    [--thr 0.5 ...]
+verify_face identify <probe> <gallery_dir> [...]
+```
+- **losses** (`face_loss.hpp`, all gradchecked to ~1e-4): `triplet_loss` (batch-all/hard, FaceNet
+  paper), `arcface_loss` (additive angular margin), `softmax_ce_loss` (cosine softmax).
+- **training** (`train_face.cpp` + `face_data.hpp`): Adam, from-pretrained fine-tune, BN train-mode,
+  checkpoint save/reload. ArcFace on a 4-identity set: loss 8.86 → 5.37 in 5 steps (decreasing).
+- **inference** (`verify_face.cpp`): unit-embedding cosine/euclidean; verify + rank-based identify.
+
 ## Roadmap
 1. ✅ extract InceptionResnetV1 arch from facenet-pytorch + fused forward exact parity (1e-7)
-2. **next:** BN-training (unfused) forward + gradcheck
-3. losses: **Triplet** (FaceNet paper) + **ArcFace/softmax** (both, per request)
-4. training loop (embed dataset → loss → Adam), checkpoints, from-pretrained fine-tune
-5. inference/verification CLI (embed a face, 1:1 verify, 1:N identify) + standalone demo
-6. all-in-one `facenet <train|embed|verify>` CLI; `.pt` I/O; ONNX
+2. ✅ BN-training (unfused) forward + gradcheck (numeric vs analytic)
+3. ✅ losses: Triplet (FaceNet paper) + ArcFace + cosine-softmax (all gradchecked)
+4. ✅ training loop (dataset → loss → Adam), checkpoints, from-pretrained fine-tune
+5. ✅ inference/verification CLI (embed, 1:1 verify, 1:N identify)
+6. **next:** standalone demo (bundled weights); all-in-one `facenet` CLI; `.pt`/ONNX I/O
 7. (later) Eigen / Thrust device / cuDNN backends, like the sibling repos
 
 Reused verbatim from the sibling engine: `autograd/backend/ops2d/linalg/bn/optim/ptio/dataset/
