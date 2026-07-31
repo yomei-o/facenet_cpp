@@ -48,6 +48,31 @@ with open(os.path.join(OUT, "manifest.txt"), "w") as f:
     for e in manifest: f.write(" ".join(str(x) for x in e) + "\n")
 open(os.path.join(OUT, "weights.bin"), "wb").write(blob)
 
+# ---- unfused (BN-training) export: conv(no bias)+BN kept separate for train-mode batch stats ----
+ublob = bytearray(); umani = []
+def uput(a): ublob.extend(np.asarray(a, dtype=np.float32).tobytes())
+for name, mod in m.named_modules():
+    t = type(mod).__name__
+    if t == "BasicConv2d":
+        c, bn = mod.conv, mod.bn; Co, Ci, kh, kw = c.weight.shape; sh, sw = c.stride; ph, pw = c.padding
+        umani.append(("B", int(Co), int(Ci), int(kh), int(kw), sh, sw, ph, pw))
+        uput(c.weight.detach().numpy()); uput(bn.weight.detach().numpy()); uput(bn.bias.detach().numpy())
+        uput(bn.running_mean.detach().numpy()); uput(bn.running_var.detach().numpy())
+    elif t == "Conv2d" and name.endswith(".conv2d"):
+        Co, Ci, kh, kw = mod.weight.shape; sh, sw = mod.stride; ph, pw = mod.padding
+        umani.append(("C", int(Co), int(Ci), int(kh), int(kw), sh, sw, ph, pw))
+        uput(mod.weight.detach().numpy()); uput(mod.bias.detach().numpy())
+umani.append(("L", int(m.last_linear.weight.shape[0]), int(m.last_linear.weight.shape[1])))
+uput(m.last_linear.weight.detach().numpy())
+bn = m.last_bn
+umani.append(("N", int(bn.weight.shape[0])))
+for a in (bn.weight, bn.bias, bn.running_mean, bn.running_var): uput(a.detach().numpy())
+with open(os.path.join(OUT, "manifest_unfused.txt"), "w") as f:
+    f.write(f"{len(umani)}\n")
+    for e in umani: f.write(" ".join(str(x) for x in e) + "\n")
+open(os.path.join(OUT, "weights_unfused.bin"), "wb").write(ublob)
+print(f"unfused: {len(umani)} ops, {len(ublob)/1e6:.1f} MB")
+
 # parity ref: raw linspace input (matches inspect_facenet.py)
 x = torch.linspace(-1, 1, 3 * S * S).reshape(1, 3, S, S)
 with torch.no_grad(): emb = m(x)
