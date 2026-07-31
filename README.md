@@ -30,6 +30,8 @@ g++ -O2 -std=c++17 -Ipure/third_party pure/m1_forward_face.cpp -o m1 && ./m1
 ```
 
 ## Browser demo (WebAssembly) — register & recognize from your webcam
+**▶ Live demo: https://yomei-o.github.io/facenet_cpp/wasm/** (GitHub Pages, HTTPS → camera works; loads ~47 MB weights on first open)
+
 A complete client-side face-recognition app in [`wasm/`](wasm/): the pure-C++ embedding compiled to
 WASM (Emscripten), a webcam UI to **register** faces and **identify** who's in front of the camera.
 No server, no upload — faces stay in `localStorage`. The prebuilt `wasm/facenet.js` + `wasm/facenet.wasm`
