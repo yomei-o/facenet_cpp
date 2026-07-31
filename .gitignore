@@ -19,3 +19,7 @@ scratch/
 !weights/facenet/
 !weights/facenet/weights_fp16.bin
 !weights/facenet/manifest.txt
+
+# wasm build outputs (regenerate with wasm/build.sh)
+wasm/facenet.data
+build_emsdk_install.log

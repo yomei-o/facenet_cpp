@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceNet WASM — register & recognize</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0f1220; --card:#1a1f36; --fg:#e8ecff; --mut:#98a2c8; --acc:#6ea8fe; --ok:#3ddc84; --bad:#ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:840px; margin:0 auto; padding:20px; }
+  h1 { font-size:20px; margin:0 0 4px; } .sub { color:var(--mut); margin:0 0 16px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; } @media(max-width:720px){ .grid{grid-template-columns:1fr;} }
+  .card { background:var(--card); border-radius:12px; padding:16px; }
+  .camwrap { position:relative; aspect-ratio:1; background:#000; border-radius:10px; overflow:hidden; }
+  video,canvas#view { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .guide { position:absolute; inset:12%; border:2px dashed rgba(255,255,255,.5); border-radius:50%; pointer-events:none; }
+  button { font:inherit; border:0; border-radius:8px; padding:9px 14px; background:var(--acc); color:#08122b; font-weight:600; cursor:pointer; }
+  button.ghost { background:#2a3157; color:var(--fg); } button:disabled{opacity:.5;cursor:default;}
+  input { font:inherit; padding:9px 12px; border-radius:8px; border:1px solid #2a3157; background:#10142a; color:var(--fg); width:100%; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  #status { font-size:13px; color:var(--mut); }
+  #result { font-size:22px; font-weight:700; margin-top:8px; min-height:30px; }
+  .people { list-style:none; margin:8px 0 0; padding:0; } .people li { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid #2a3157; }
+  .people .del { background:transparent; color:var(--bad); padding:2px 6px; font-size:12px; }
+  .mut { color:var(--mut); font-size:12px; } .slider { width:100%; }
+  code { background:#10142a; padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FaceNet · WASM face recognition</h1>
+  <p class="sub">Pure-C++ InceptionResnetV1 (512-D embedding) compiled to WebAssembly. Everything runs
+     in your browser — <b>no image is ever uploaded</b>. Faces are stored only in this browser (localStorage).</p>
+  <div id="status">Loading model (~47 MB, first time only)…</div>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="card">
+      <div class="camwrap"><video id="cam" autoplay playsinline muted></video><div class="guide"></div></div>
+      <canvas id="view" hidden></canvas>
+      <div class="row"><button id="startCam" class="ghost">Enable camera</button>
+        <span class="mut">Center your face in the circle.</span></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><input id="name" placeholder="Name to register" autocomplete="off">
+        <button id="reg" disabled>Register face</button></div>
+      <div class="row"><button id="idf" disabled>Identify</button>
+        <label class="mut">threshold <span id="thrv">0.48</span>
+          <input id="thr" class="slider" type="range" min="0" max="0.9" step="0.01" value="0.48"></label></div>
+      <div id="result"></div>
+      <h3 style="margin:14px 0 0;font-size:14px">Registered</h3>
+      <ul id="people" class="people"></ul>
+    </div>
+  </div>
+  <p class="mut" style="margin-top:16px">Serve over <code>http://localhost</code> or HTTPS (camera needs a secure context).
+     Best results with a frontal, well-lit face; MTCNN alignment would push accuracy higher.</p>
+</div>
+
+<script src="facenet.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const statusEl = $('status'), resultEl = $('result');
+let Module = null, ready = false, stream = null;
+const view = $('view'), vctx = view.getContext('2d', { willReadFrequently: true });
+let people = JSON.parse(localStorage.getItem('facenet_people') || '{}');   // name -> [ [512], ... ]
+
+async function loadWeights(M) {           // fetch the tracked fp16 weights -> MEMFS (no data baked into the wasm)
+  const base = '../weights/facenet/';
+  const man = await (await fetch(base + 'manifest.txt')).text();
+  const w = new Uint8Array(await (await fetch(base + 'weights_fp16.bin')).arrayBuffer());
+  try { M.FS.mkdir('/facenet'); } catch (e) {}
+  M.FS.writeFile('/facenet/manifest.txt', man);
+  M.FS.writeFile('/facenet/weights_fp16.bin', w);
+  M._fn_ready();
+}
+createFaceNet().then(async m => { Module = m;
+  statusEl.textContent = 'Loading weights (~47 MB, cached after first load)…';
+  await loadWeights(m); ready = true;
+  statusEl.textContent = 'Model ready. Enable the camera to begin.';
+  refresh(); syncButtons();
+}).catch(e => statusEl.textContent = 'Model load failed: ' + e);
+
+$('startCam').onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    $('cam').srcObject = stream; statusEl.textContent = 'Camera on.'; syncButtons();
+  } catch (e) { statusEl.textContent = 'Camera error: ' + e.message; }
+};
+
+function syncButtons() { const on = ready && stream; $('reg').disabled = !on; $('idf').disabled = !on; }
+
+function captureEmbedding() {
+  const v = $('cam'); const w = v.videoWidth, h = v.videoHeight;
+  view.width = w; view.height = h; vctx.drawImage(v, 0, 0, w, h);
+  const data = vctx.getImageData(0, 0, w, h).data;             // RGBA
+  const ptr = Module._malloc(data.length);
+  Module.HEAPU8.set(data, ptr);
+  const outPtr = Module._fn_embed(ptr, w, h);                  // float* offset
+  const emb = new Float32Array(512);
+  for (let i = 0; i < 512; i++) emb[i] = Module.HEAPF32[(outPtr >> 2) + i];
+  Module._free(ptr);
+  return emb;
+}
+const cos = (a, b) => { let s = 0; for (let i = 0; i < 512; i++) s += a[i] * b[i]; return s; };
+function meanEmb(list) { const m = new Float32Array(512); for (const e of list) for (let i = 0; i < 512; i++) m[i] += e[i];
+  let n = 0; for (let i = 0; i < 512; i++) n += m[i] * m[i]; n = Math.sqrt(n) || 1; for (let i = 0; i < 512; i++) m[i] /= n; return m; }
+
+$('reg').onclick = () => {
+  const name = $('name').value.trim(); if (!name) { resultEl.textContent = 'Enter a name first.'; return; }
+  const e = Array.from(captureEmbedding());
+  (people[name] = people[name] || []).push(e);
+  localStorage.setItem('facenet_people', JSON.stringify(people));
+  resultEl.style.color = 'var(--ok)'; resultEl.textContent = `Registered “${name}” (${people[name].length})`;
+  $('name').value = ''; refresh();
+};
+
+$('idf').onclick = () => {
+  const q = captureEmbedding(); const names = Object.keys(people);
+  if (!names.length) { resultEl.style.color = 'var(--mut)'; resultEl.textContent = 'No one registered yet.'; return; }
+  let best = null, bs = -2;
+  for (const n of names) { const s = cos(q, meanEmb(people[n].map(Float32Array.from))); if (s > bs) { bs = s; best = n; } }
+  const thr = parseFloat($('thr').value);
+  if (bs >= thr) { resultEl.style.color = 'var(--ok)'; resultEl.textContent = `✓ ${best}  (${bs.toFixed(3)})`; }
+  else { resultEl.style.color = 'var(--bad)'; resultEl.textContent = `Unknown  (closest ${best} ${bs.toFixed(3)})`; }
+};
+
+$('thr').oninput = () => $('thrv').textContent = parseFloat($('thr').value).toFixed(2);
+
+function refresh() {
+  const ul = $('people'); ul.innerHTML = '';
+  for (const n of Object.keys(people)) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${n} <span class="mut">×${people[n].length}</span></span>`;
+    const b = document.createElement('button'); b.className = 'del'; b.textContent = 'delete';
+    b.onclick = () => { delete people[n]; localStorage.setItem('facenet_people', JSON.stringify(people)); refresh(); };
+    li.appendChild(b); ul.appendChild(li);
+  }
+  if (!Object.keys(people).length) ul.innerHTML = '<li class="mut" style="border:0">none yet</li>';
+}
+</script>
+</body>
+</html>

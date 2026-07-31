@@ -16,7 +16,9 @@
 template <class F>
 inline void parallel_for(int64_t n, F body) {
   if (n <= 0) return;
-#ifdef _OPENMP
+#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+  for (int64_t i = 0; i < n; ++i) body(i);        // WASM (no threads): serial
+#elif defined(_OPENMP)
   #pragma omp parallel for
   for (long long i = 0; i < (long long)n; ++i) body((int64_t)i);
 #else

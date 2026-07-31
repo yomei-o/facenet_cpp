@@ -29,6 +29,17 @@ m1_forward_face pure/ref/data_net/ pure/ref/ 160   # -> worst 1.19e-07 MATCH
 g++ -O2 -std=c++17 -Ipure/third_party pure/m1_forward_face.cpp -o m1 && ./m1
 ```
 
+## Browser demo (WebAssembly) — register & recognize from your webcam
+A complete client-side face-recognition app in [`wasm/`](wasm/): the pure-C++ embedding compiled to
+WASM (Emscripten), a webcam UI to **register** faces and **identify** who's in front of the camera.
+No server, no upload — faces stay in `localStorage`. The prebuilt `wasm/facenet.js` + `wasm/facenet.wasm`
+are committed and load the tracked `weights/facenet/` at runtime, so no Emscripten is needed to run it:
+```sh
+python -m http.server 8000        # from the repo root
+# open http://localhost:8000/wasm/  (camera needs localhost or HTTPS)
+```
+Verified: the WASM module reproduces the reference embedding to **1.9e-04** (fp16). See [`wasm/README.md`](wasm/README.md).
+
 ## Quick start — face recognition right after `git clone` (no Python)
 
 Pretrained fp16 weights ship in the repo (`weights/facenet/`, ~47 MB). `demo_face` is fully
@@ -81,7 +92,8 @@ Eigen (same results, ~faster) — the conv/gemm already go through the `bk::` ba
 10. ✅ Thrust **device** engine (`dface_ops.hpp`/`dface.hpp`, one source CPU/GPU) — eval forward
     parity **1.42e-07** on the CPU-thrust backend; `nvcc -DUSE_CUDA` compiles clean (sm_75).
     Colab T4 run: `colab/gpu_check.ipynb` (only the GPU *execution* is pending hardware).
-11. (later) device training + cuBLAS/cuDNN fast paths on GPU
+11. ✅ **WebAssembly** browser app (`wasm/`): webcam register + identify, client-side, WASM parity 1.9e-04
+12. (later) device training + cuBLAS/cuDNN on GPU; in-browser face detection (BlazeFace) for auto-crop
 
 Reused verbatim from the sibling engine: `autograd/backend/ops2d/linalg/bn/optim/ptio/dataset/
 parallel/dtensor` + stb + flat Eigen. FaceNet-specific: `face_ops.hpp`, `net_facenet.hpp`, `pure/ref/*`.
