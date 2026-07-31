@@ -1,0 +1,15 @@
+build/
+*.exe
+*.obj
+*.lib
+*.exp
+*.pdb
+*.o
+*.bin
+*.onnx
+*.pt
+__pycache__/
+pure/ref/data_net/
+/*.png
+out/
+scratch/
