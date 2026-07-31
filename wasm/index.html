@@ -119,7 +119,7 @@ $('idf').onclick = () => {
   const q = captureEmbedding(); const names = Object.keys(people);
   if (!names.length) { resultEl.style.color = 'var(--mut)'; resultEl.textContent = 'No one registered yet.'; return; }
   let best = null, bs = -2;
-  for (const n of names) { const s = cos(q, meanEmb(people[n].map(Float32Array.from))); if (s > bs) { bs = s; best = n; } }
+  for (const n of names) { const s = cos(q, meanEmb(people[n])); if (s > bs) { bs = s; best = n; } }
   const thr = parseFloat($('thr').value);
   if (bs >= thr) { resultEl.style.color = 'var(--ok)'; resultEl.textContent = `✓ ${best}  (${bs.toFixed(3)})`; }
   else { resultEl.style.color = 'var(--bad)'; resultEl.textContent = `Unknown  (closest ${best} ${bs.toFixed(3)})`; }
