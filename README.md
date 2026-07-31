@@ -78,7 +78,10 @@ Eigen (same results, ~faster) — the conv/gemm already go through the `bk::` ba
    (**5.96e-08**) and a pure-C++ ONNX runner (`onnx_run_face.hpp`, **1.19e-07**)
 8. ✅ standalone `demo_face` with bundled fp16 weights (clone-and-run, no Python; ~2e-04 vs fp32)
 9. ✅ real-data eval on LFW (97.3% @ cos≥0.48, pure C++) + verify-threshold calibration
-10. **next:** Thrust/cuDNN device backend + Colab GPU, like the sibling repos
+10. ✅ Thrust **device** engine (`dface_ops.hpp`/`dface.hpp`, one source CPU/GPU) — eval forward
+    parity **1.42e-07** on the CPU-thrust backend; `nvcc -DUSE_CUDA` compiles clean (sm_75).
+    Colab T4 run: `colab/gpu_check.ipynb` (only the GPU *execution* is pending hardware).
+11. (later) device training + cuBLAS/cuDNN fast paths on GPU
 
 Reused verbatim from the sibling engine: `autograd/backend/ops2d/linalg/bn/optim/ptio/dataset/
 parallel/dtensor` + stb + flat Eigen. FaceNet-specific: `face_ops.hpp`, `net_facenet.hpp`, `pure/ref/*`.
